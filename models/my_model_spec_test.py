@@ -73,8 +73,18 @@ class Autoencoder(Model):
 
         sf.write(f"figs/{self.model_name}/Model_{self.model_name}_output.flac", modelYwave, 1600)
 
+        # Convert the waveform to a spectrogram via a STFT.
+        spectrogram = tf.signal.stft(
+        modelYwave, frame_length=120, frame_step=32)
+        # Obtain the magnitude of the STFT.
+        spectrogram = tf.abs(spectrogram)
+        # Add a `channels` dimension, so that the spectrogram can be used
+        # as image-like input data with convolution layers (which expect
+        # shape (`batch_size`, `height`, `width`, `channels`).
+        spectrogram = spectrogram[..., tf.newaxis]
+
         
-        fig, axs = plt.subplots(2,1)
+        fig, axs = plt.subplots(3,1)
         axs[0].imshow(display_Y, origin='lower', aspect='auto',
             extent=self.spectro.extent(self.out_shape[0]), cmap='inferno')
         axs[0].set_title(f"Reconstructed Audio Spectrogram (Latent Space = {self.latent_dim})")
@@ -82,6 +92,11 @@ class Autoencoder(Model):
         axs[1].imshow(true_Y, origin='lower', aspect='auto',
             extent=self.spectro.extent(self.out_shape[0]), cmap='inferno')		
         axs[1].set_title("True Audio Spectrogram")
+
+        plot_spectrogram(spectrogram.numpy(), axs[2])
+        axs[2].set_title('Spectrogram')
+        plt.suptitle('test_spec')
+        #plt.show()
        
         fig.legend()
         
@@ -235,3 +250,17 @@ class Autoencoder(Model):
                 )
 
 #python testing_script.py my_model_spec_test 100
+
+def plot_spectrogram(spectrogram, ax):
+  if len(spectrogram.shape) > 2:
+    assert len(spectrogram.shape) == 3
+    spectrogram = np.squeeze(spectrogram, axis=-1)
+  # Convert the frequencies to log scale and transpose, so that the time is
+  # represented on the x-axis (columns).
+  # Add an epsilon to avoid taking a log of zero.
+  log_spec = np.log(spectrogram.T + np.finfo(float).eps)
+  height = log_spec.shape[0]
+  width = log_spec.shape[1]
+  X = np.linspace(0, np.size(spectrogram), num=width, dtype=int)
+  Y = range(height)
+  ax.pcolormesh(X, Y, log_spec)
