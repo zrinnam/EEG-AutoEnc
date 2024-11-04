@@ -66,16 +66,16 @@ class Autoencoder(Model):
         plt.plot(true_wave)
         plt.savefig(f"figs/{self.model_name}/Model_{self.model_name}_{self.latent_dim}_realwave.png")
         
-        sf.write(f"figs/{self.model_name}/Model_{self.model_name}_{self.latent_dim}_og_audio.flac", true_wave, 1600)
+        sf.write(f"figs/{self.model_name}/Model_{self.model_name}_{self.latent_dim}_og_audio.flac", true_wave, 250)
 
         plt.plot(modelYwave)
         plt.savefig(f"figs/{self.model_name}/Model_{self.model_name}_{self.latent_dim}_wave.png")
 
-        sf.write(f"figs/{self.model_name}/Model_{self.model_name}_output.flac", modelYwave, 1600)
+        sf.write(f"figs/{self.model_name}/Model_{self.model_name}_output.flac", modelYwave, 250)
 
         # Convert the waveform to a spectrogram via a STFT.
         spectrogram = tf.signal.stft(
-        modelYwave, frame_length=120, frame_step=32)
+        modelYwave, frame_length=250, frame_step=75)
         # Obtain the magnitude of the STFT.
         spectrogram = tf.abs(spectrogram)
         # Add a `channels` dimension, so that the spectrogram can be used
@@ -148,7 +148,7 @@ class Autoencoder(Model):
         
         #SPECTROGRAM ACTUALLY GETS CALC'D HERE
         
-        window = sig.windows.gaussian(30, std=5, sym=True)
+        window = sig.windows.gaussian(30, std=3, sym=True)
         spectro = sig.ShortTimeFFT(win=window, hop=19, fs=sample_rate, scale_to='magnitude')
         self.Y_train = spectro.stft(self.Y_train)
         
