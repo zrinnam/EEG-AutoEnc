@@ -66,15 +66,25 @@ class Autoencoder(Model):
         plt.plot(true_wave)
         plt.savefig(f"figs/{self.model_name}/Model_{self.model_name}_{self.latent_dim}_realwave.png")
         
-        sf.write(f"figs/{self.model_name}/Model_{self.model_name}_{self.latent_dim}_og_audio.flac", true_wave, 1600)
+        sf.write(f"figs/{self.model_name}/Model_{self.model_name}_{self.latent_dim}_og_audio.flac", true_wave, 250)
 
         plt.plot(modelYwave)
         plt.savefig(f"figs/{self.model_name}/Model_{self.model_name}_{self.latent_dim}_wave.png")
 
-        sf.write(f"figs/{self.model_name}/Model_{self.model_name}_output.flac", modelYwave, 1600)
+        sf.write(f"figs/{self.model_name}/Model_{self.model_name}_{self.latent_dim}_output.flac", modelYwave, 250)
+
+        # Convert the waveform to a spectrogram via a STFT.
+        spectrogram = tf.signal.stft(
+        modelYwave, frame_length=250, frame_step=75)
+        # Obtain the magnitude of the STFT.
+        spectrogram = tf.abs(spectrogram)
+        # Add a `channels` dimension, so that the spectrogram can be used
+        # as image-like input data with convolution layers (which expect
+        # shape (`batch_size`, `height`, `width`, `channels`).
+        spectrogram = spectrogram[..., tf.newaxis]
 
         
-        fig, axs = plt.subplots(2,1)
+        fig, axs = plt.subplots(3,1)
         axs[0].imshow(display_Y, origin='lower', aspect='auto',
             extent=self.spectro.extent(self.out_shape[0]), cmap='inferno')
         axs[0].set_title(f"Reconstructed Audio Spectrogram (Latent Space = {self.latent_dim})")
@@ -82,6 +92,11 @@ class Autoencoder(Model):
         axs[1].imshow(true_Y, origin='lower', aspect='auto',
             extent=self.spectro.extent(self.out_shape[0]), cmap='inferno')		
         axs[1].set_title("True Audio Spectrogram")
+
+        plot_spectrogram(spectrogram.numpy(), axs[2])
+        axs[2].set_title('Spectrogram')
+        plt.suptitle('test_spec')
+        #plt.show()
        
         fig.legend()
         
@@ -106,40 +121,42 @@ class Autoencoder(Model):
         print(self.test_loss)
 
 
-    def process_data(self, eeg, audio, sample_rate, mode, segments, seconds):
-
+    def process_data(self, eeg, audio, sample_rate, events, event_dict=None):
+        '''process the data before running the model. Requires eeg, audio, and the
+        sample_rate to downsample the audio to.'''
+        
         #calculate spectrogram of average of the two audio channels
         audio = np.atleast_2d(np.average(audio.T, axis=0))
-        audio_scaler = StandardScaler()
-        #plt.figure()
-        # plt.subplot(1,1,1)
-        #plt.plot(audio)
         
-       
-        #plt.plot(true_Y)
-        #plt.savefig(f"figs/{self.model_name}/Model_{self.model_name}_{self.latent_dim}_wave.png", dpi=300)
-
+        #downsample audio
+        
+        audio = sig.resample(audio, eeg.shape[1], axis=1)
+        
+        # events = events[1:, 0]
+        #split audio and eeg into event segments
+        split_eeg = helper.split_events(eeg, events[1:-1], sample_rate)
+        split_audio = helper.split_events(audio, events[1:-1], sample_rate)
 
         #split data into train, test, validation
         self.X_train, self.Y_train, self.X_test, self.Y_test, self.X_val, self.Y_val = \
-        helper.train_test_val_split(eeg, audio, self.train_size, \
-                            self.test_size, sample_rate, self.random_state, \
-                            mode=mode, num_segments=segments, \
-                            seconds=seconds)
+        helper.train_test_val_split(split_eeg, split_audio, self.train_size, \
+                            self.test_size, self.random_state)
 
         self.Y_train = self.Y_train[:,0,:]
         self.Y_test = self.Y_test[:,0,:]
         self.Y_val = self.Y_val[:,0,:]
-
-        window = sig.windows.gaussian(30, std=5, sym=True)
+        
+        #SPECTROGRAM ACTUALLY GETS CALC'D HERE
+        
+        window = sig.windows.gaussian(30, std=3, sym=True)
         spectro = sig.ShortTimeFFT(win=window, hop=19, fs=sample_rate, scale_to='magnitude')
-        #waveform = spectro.istft()
         self.Y_train = spectro.stft(self.Y_train)
         
         self.Y_test = spectro.stft(self.Y_test)
         
         self.Y_val = spectro.stft(self.Y_val)
 
+        #Need this for applying inverse FFT later
         self.spectro = spectro
 
 
@@ -235,3 +252,17 @@ class Autoencoder(Model):
                 )
 
 #python testing_script.py my_model_spec_test 100
+
+def plot_spectrogram(spectrogram, ax):
+  if len(spectrogram.shape) > 2:
+    assert len(spectrogram.shape) == 3
+    spectrogram = np.squeeze(spectrogram, axis=-1)
+  # Convert the frequencies to log scale and transpose, so that the time is
+  # represented on the x-axis (columns).
+  # Add an epsilon to avoid taking a log of zero.
+  log_spec = np.log(spectrogram.T + np.finfo(float).eps)
+  height = log_spec.shape[0]
+  width = log_spec.shape[1]
+  X = np.linspace(0, np.size(spectrogram), num=width, dtype=int)
+  Y = range(height)
+  ax.pcolormesh(X, Y, log_spec)

@@ -86,7 +86,7 @@ class Autoencoder(Model):
         
         audio = sig.resample(audio, eeg.shape[1], axis=1)
         
-        events = events[1:, 0]
+        # events = events[1:, 0]
         #split audio and eeg into event segments
         split_eeg = helper.split_events(eeg, events[1:-1], sample_rate)
         split_audio = helper.split_events(audio, events[1:-1], sample_rate)
