@@ -71,7 +71,7 @@ class Autoencoder(Model):
         plt.plot(modelYwave)
         plt.savefig(f"figs/{self.model_name}/Model_{self.model_name}_{self.latent_dim}_wave.png")
 
-        sf.write(f"figs/{self.model_name}/Model_{self.model_name}_output.flac", modelYwave, 250)
+        sf.write(f"figs/{self.model_name}/Model_{self.model_name}_{self.latent_dim}_output.flac", modelYwave, 250)
 
         # Convert the waveform to a spectrogram via a STFT.
         spectrogram = tf.signal.stft(
