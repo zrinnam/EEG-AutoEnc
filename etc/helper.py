@@ -28,7 +28,7 @@ def load_audio(filename: str) -> np.ndarray:
 
     return (audio, aud_samp_rate)
 
-def split_events(X, events, sample_rate, bound=(10, 10)) -> np.ndarray:
+def split_events(X, events, sample_rate, bound=(0.1, 0.25)) -> np.ndarray:
     '''Split data based on sample-points. Bound should be a tuple of the bound
     around each event (eg. -100ms before and +250ms after each event should be
     given to the function as (0.1, 0.25)).'''
