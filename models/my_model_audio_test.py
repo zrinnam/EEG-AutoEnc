@@ -155,9 +155,12 @@ class Autoencoder(Model):
         
         #SPECTROGRAM ACTUALLY GETS CALC'D HERE
         
-        window = sig.windows.gaussian(30, std=5, sym=True)
-        spectro = sig.ShortTimeFFT(win=window, hop=19, fs=sample_rate, scale_to='magnitude')
+        window = sig.windows.gaussian(16, std=2, sym=True)
+        spectro = sig.ShortTimeFFT(win=window, hop=4, fs=sample_rate, scale_to='magnitude')
+        print('before spec', self.Y_train.shape)
+        print('Anticipated dim', self.Y_train.shape[1]/4)
         self.Y_train = spectro.stft(self.Y_train)
+        print("actual dim", self.Y_train.shape)
         
         self.Y_test = spectro.stft(self.Y_test)
         
@@ -171,6 +174,7 @@ class Autoencoder(Model):
         self.X_train = self.X_train.reshape(self.X_train.shape[0], self.X_train.shape[1], self.X_train.shape[2], 1)
         self.in_shape = self.X_train.shape[1:]
         self.out_shape = self.Y_train.shape[1:]
+        print(self.out_shape, "this")
 
         self.Y_train_real = np.real(self.Y_train)
         self.Y_train_imag = np.imag(self.Y_train)
@@ -179,7 +183,7 @@ class Autoencoder(Model):
         self.Y_val_imag = np.imag(self.Y_val)
 
         self.encoder_real = tf.keras.Sequential([
-            layers.Input(shape=(31, 87, 1)),
+            layers.Input(shape=self.in_shape),
             layers.Conv2D(16, (3, 3), strides=2, padding='same', activation='relu'),
             layers.MaxPooling2D(),
             layers.Dropout(0.25),
@@ -195,7 +199,7 @@ class Autoencoder(Model):
         ])
 
         self.encoder_imag = tf.keras.Sequential([
-            layers.Input(shape=(31, 87, 1)),
+            layers.Input(shape=self.in_shape),
             layers.Conv2D(16, (3, 3), strides=2, padding='same', activation='relu'),
             layers.MaxPooling2D(),
             layers.Dropout(0.25),
@@ -211,31 +215,28 @@ class Autoencoder(Model):
         ])
 
         self.decoder_real = tf.keras.Sequential([
-            # Start with a Dense layer to expand the latent vector
-            layers.Dense(16 * 6, activation='relu'),  # Ensure this is large enough to reshape to (16, 6)
-            layers.Reshape((16, 6, 1)),  # Reshape to a format that can be processed by Conv2DTranspose
-            
-            # Apply Conv2DTranspose layers to upsample to the desired dimensions
-            layers.Conv2DTranspose(16, (3, 3), strides=2, padding='same', activation='relu'),
-            layers.Conv2DTranspose(8, (3, 3), strides=2, padding='same', activation='relu'),
-            layers.Conv2DTranspose(4, (3, 3), strides=2, padding='same', activation='relu'),
-            
-            # Final Conv2DTranspose to match the desired output size
-            layers.Conv2DTranspose(1, (3, 3), strides=2, padding='same', activation='sigmoid'),
-            
-            # Reshape to the final output shape
-            layers.Reshape((16, 6))  # This ensures the output matches the target shape
+            layers.Dense(4, activation='relu'),
+            layers.Reshape((2, 2, 1)),
+            layers.Conv2DTranspose(2, (3, 3), strides=3, padding='same', activation='relu'),
+            layers.Conv2DTranspose(1, (3, 3), strides=3, padding='same', activation='relu'),
+            # layers.Reshape((64, 4)),
+            # layers.Conv2DTranspose(1, (3, 3), strides=2, padding='same', activation='relu'),
+            # layers.Conv2DTranspose(16, (3, 3), strides=2, padding='same', activation='relu'),
+            # layers.Conv2DTranspose(1, (3, 3), strides=2, padding='same', activation='sigmoid'),
+            layers.Reshape(self.out_shape)  # Final shape for spectrogram
 
         ])
 
         self.decoder_imag = tf.keras.Sequential([
-            layers.Dense(16 * 6, activation='relu'),
-            layers.Reshape((16, 6, 1)),
-            layers.Conv2DTranspose(16, (3, 3), strides=2, padding='same', activation='relu'),
-            layers.Conv2DTranspose(8, (3, 3), strides=2, padding='same', activation='relu'),
-            layers.Conv2DTranspose(4, (3, 3), strides=2, padding='same', activation='relu'),
-            layers.Conv2DTranspose(1, (3, 3), strides=2, padding='same', activation='sigmoid'),
-            layers.Reshape((16, 6)) 
+            layers.Dense(4, activation='relu'),
+            layers.Reshape((2, 2, 1)),
+            layers.Conv2DTranspose(2, (3, 3), strides=3, padding='same', activation='relu'),
+            layers.Conv2DTranspose(1, (3, 3), strides=3, padding='same', activation='relu'),
+            # layers.Reshape((64, 4)),
+            # layers.Conv2DTranspose(1, (3, 3), strides=2, padding='same', activation='relu'),
+            # layers.Conv2DTranspose(16, (3, 3), strides=2, padding='same', activation='relu'),
+            # layers.Conv2DTranspose(1, (3, 3), strides=2, padding='same', activation='sigmoid'),
+            layers.Reshape(self.out_shape)  # Final shape for spectrogram
         ])
 
         self.compile(optimizer="Adam", loss=losses.MeanSquaredError())
